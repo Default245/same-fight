@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>same fight · test tally</title>
+<style>body{font-family:system-ui,sans-serif;background:#0b0b10;color:#fff;max-width:720px;margin:auto;padding:24px}
+table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #333;text-align:right}td:first-child,th:first-child{text-align:left}
+.pass{color:#c6ff3d}.kill{color:#ff3d8b}.wait{color:#ffd23d}small{color:#aaa}</style></head>
+<body><h1>same fight · test tally</h1>
+<p><small>Visits = unique browsers per day (no cookies). Signups here are counted by the browser after a successful save; your Gmail inbox is the source of truth. Pass: 10% or more after 300+ visits. Kill or pivot: under 6.6% after two rounds of changes.</small></p>
+<table id="t"><tr><th>src</th><th>visits</th><th>signups</th><th>rate</th></tr></table>
+<p id="v"></p>
+<script>
+var B='https://abacus.jasoncameron.dev/get/samefight-d245/';
+var srcs=['h1','h2','h3','h4','h5','h6','h7','h8','bio','direct','test'];
+function g(k){return fetch(B+k).then(function(r){return r.json()}).then(function(j){return j.value>0?j.value:0}).catch(function(){return 0})}
+function pct(s,v){return v?(100*s/v).toFixed(1)+'%':'—'}
+Promise.all([g('visits'),g('signups'),g('partner-yes')].concat(srcs.map(function(s){return Promise.all([g('visits-'+s),g('signups-'+s)])}))).then(function(a){
+  var t=document.getElementById('t');
+  srcs.forEach(function(s,i){var r=a[3+i];t.insertAdjacentHTML('beforeend','<tr><td>'+s+'</td><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+pct(r[1],r[0])+'</td></tr>')});
+  t.insertAdjacentHTML('beforeend','<tr><th>total</th><th>'+a[0]+'</th><th>'+a[1]+'</th><th>'+pct(a[1],a[0])+'</th></tr>');
+  var rate=a[0]?a[1]/a[0]:0, cls=a[0]<300?'wait':(rate>=.10?'pass':(rate<.066?'kill':'wait'));
+  document.getElementById('v').innerHTML='<b class="'+cls+'">'+(a[0]<300?'keep going: under 300 visits':(rate>=.10?'PASS':(rate<.066?'below 6.6%: change the page, or kill after round 2':'in between: iterate')))+'</b> · partner said yes: '+a[2]+' ('+pct(a[2],a[1])+' of signups)';
+});
+</script></body></html>
