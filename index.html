@@ -238,14 +238,19 @@
         </div>
       </div>
       <div class="qcard">
-        <div class="form">
-          <input type="text" id="name" placeholder="first name" aria-label="First name">
-          <input type="email" id="email" placeholder="you@email.com" aria-label="Email">
-          <label><input type="checkbox" id="partner"> my partner would do this with me 💞</label>
-          <button class="btn main" type="button" onclick="joinWaitlist()" style="justify-content:center">get my same fight →</button>
-          <p class="thanks" id="thanks">you're in 🔁 (demo: signup isn't connected yet)</p>
-          <p class="micro">Waitlist only. No spam. We never contact your partner.</p>
-        </div>
+        <form class="form" id="wl" onsubmit="return joinWaitlist(event)" novalidate>
+          <input type="text" id="name" name="name" placeholder="first name" aria-label="First name" autocomplete="given-name" maxlength="60">
+          <input type="email" id="email" name="email" placeholder="you@email.com" aria-label="Email" autocomplete="email" required maxlength="120">
+          <label><input type="checkbox" id="partner" name="partner"> my partner would do this with me 💞</label>
+          <input type="hidden" id="src" name="src" value="direct">
+          <div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+            <label>leave this empty <input type="text" id="hp" name="_honey" tabindex="-1" autocomplete="off"></label>
+          </div>
+          <button class="btn main" id="wlbtn" type="submit" style="justify-content:center">get my same fight →</button>
+          <p class="thanks" id="thanks">you're in 🔁 we'll email you when it's your turn.</p>
+          <p class="micro" id="wlerr" style="display:none;color:#ff8fb8"></p>
+          <p class="micro">Waitlist only. We keep your name and email just to tell you about launch. No spam. We never contact your partner. Visits are counted anonymously, with no cookies.</p>
+        </form>
       </div>
     </div>
   </div>
@@ -273,11 +278,49 @@
 <footer>same fight 🔁 (working name) · pre-launch concept · not therapy</footer>
 
 <script>
-  function joinWaitlist(){
-    // Placeholder: no backend connected.
+  // ---- config ----
+  var FORM_ENDPOINT='https://formsubmit.co/ajax/jeremycooperboivin@gmail.com'; // swap the email for FormSubmit's random alias after activation
+  var COUNTER='https://abacus.jasoncameron.dev/hit/samefight-d245/';
+  // ---- src tracking (?src=h1 or ?utm_content=h1 / ?utm_source=tiktok) ----
+  function clean(v){return (v||'').toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,20);}
+  var q=new URLSearchParams(location.search);
+  var SRC=clean(q.get('src')||q.get('utm_content')||q.get('utm_source'));
+  try{ if(SRC){sessionStorage.setItem('sf_src',SRC);} else {SRC=sessionStorage.getItem('sf_src')||'direct';} }catch(e){ SRC=SRC||'direct'; }
+  document.getElementById('src').value=SRC;
+  // ---- cookieless visit counting: one count per browser per day ----
+  function hit(key){ try{ fetch(COUNTER+key,{mode:'cors',keepalive:true}).catch(function(){}); }catch(e){} }
+  (function(){
+    if(q.get('test')==='1') return; // ?test=1 skips counting for your own checks
+    var day=new Date().toISOString().slice(0,10), k='sf_seen_'+day;
+    try{ if(localStorage.getItem(k)) return; localStorage.setItem(k,'1'); }catch(e){}
+    hit('visits'); hit('visits-'+SRC);
+  })();
+  // ---- waitlist ----
+  var sending=false;
+  function joinWaitlist(ev){
+    if(ev) ev.preventDefault();
+    if(sending) return false;
+    var err=document.getElementById('wlerr'); err.style.display='none';
+    if(document.getElementById('hp').value){ document.getElementById('thanks').style.display='block'; return false; }
     var e=document.getElementById('email').value.trim();
-    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){alert('Enter a valid email');return;}
-    document.getElementById('thanks').style.display='block';
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){ err.textContent='enter a real email so we can find you 👀'; err.style.display='block'; return false; }
+    var nm=document.getElementById('name').value.trim();
+    var partner=document.getElementById('partner').checked?'yes':'no';
+    var btn=document.getElementById('wlbtn'); sending=true; btn.textContent='saving…';
+    fetch(FORM_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({name:nm,email:e,partner_would_join:partner,src:SRC,page:location.href,
+        _subject:'Same Fight signup ('+SRC+')',_template:'table',_captcha:'false',_honey:''})})
+    .then(function(r){return r.json().catch(function(){return {};}).then(function(j){return {ok:r.ok,j:j};});})
+    .then(function(res){
+      sending=false;
+      if(res.ok && String(res.j.success)!=='false'){
+        document.getElementById('wl').querySelectorAll('input,button').forEach(function(x){x.disabled=true;});
+        btn.textContent='saved ✓'; document.getElementById('thanks').style.display='block';
+        if(q.get('test')!=='1'){ hit('signups'); hit('signups-'+SRC); if(partner==='yes') hit('partner-yes'); }
+      } else { throw new Error(res.j.message||'failed'); }
+    })
+    .catch(function(){ sending=false; btn.textContent='get my same fight →'; err.textContent='that didn\'t go through. try again in a sec 🙏'; err.style.display='block'; });
+    return false;
   }
   function copyInvite(){
     document.getElementById('copied').textContent='Placeholder: there is no real invite link to copy yet.';
